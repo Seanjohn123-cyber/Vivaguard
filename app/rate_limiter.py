@@ -10,12 +10,17 @@ class TokenBucket:
         self.last_refill = time.monotonic()
 
     def _refill(self) -> None:
+        """Refills tokens in the bucket proportional to elapsed monotonic time."""
         now = time.monotonic()
         elapsed = now - self.last_refill
         self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate)
         self.last_refill = now
 
     def consume(self, amount: float = 1.0) -> bool:
+        """Attempts to consume requested token amount from bucket.
+
+        Returns True if sufficient tokens were available and consumed, False otherwise.
+        """
         self._refill()
         if self.tokens >= amount:
             self.tokens -= amount
@@ -39,6 +44,7 @@ class RateLimiter:
         self._bucket_refill_rate = token_bucket_refill_rate
 
     def _get_bucket(self, session_id: str) -> TokenBucket:
+        """Retrieves or initializes a TokenBucket instance for the specified session ID."""
         bucket = self._token_buckets.get(session_id)
         if bucket is None:
             bucket = TokenBucket(self._bucket_capacity, self._bucket_refill_rate)
@@ -46,6 +52,10 @@ class RateLimiter:
         return bucket
 
     def allow(self, session_id: str, tokens: int | None = None) -> bool:
+        """Evaluates whether a request from session_id is allowed under token bucket & sliding window constraints.
+
+        Returns True if request is allowed, False if rate limit is exceeded.
+        """
         requested_tokens = self.tokens_per_request if tokens is None else tokens
         bucket = self._get_bucket(session_id)
 
