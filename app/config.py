@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     assemblyai_realtime_url: str = "wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=universal-3-5-pro"
     assemblyai_sample_rate: int = 16000
 
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-flash-latest"
+    gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
