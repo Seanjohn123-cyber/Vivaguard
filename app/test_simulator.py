@@ -12,6 +12,51 @@ from app.config import settings
 
 ASSEMBLYAI_LLM_GATEWAY_URL = "https://llm-gateway.assemblyai.com/v1/chat/completions"
 DEFAULT_LLM_MODEL = "qwen3.5-4b-32k-fast"
+GEMINI_JSON_MIME_TYPE = "application/json"
+
+
+def call_gemini(prompt: str, retries: int = 2) -> str | None:
+    """Call Gemini using a server-side API key and return the generated text."""
+    if not settings.gemini_api_key:
+        return None
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": GEMINI_JSON_MIME_TYPE},
+    }
+    endpoint = f"{settings.gemini_api_url.rstrip('/')}/{settings.gemini_model}:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": settings.gemini_api_key,
+    }
+
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(
+                endpoint,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                candidates = data.get("candidates", [])
+                parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+                text = "".join(str(part.get("text", "")) for part in parts)
+                if text:
+                    return text
+        except urllib.error.HTTPError as http_err:
+            if http_err.code == 429 and attempt < retries:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            return None
+        except (OSError, ValueError, KeyError, TypeError):
+            if attempt < retries:
+                time.sleep(1.0)
+                continue
+            return None
+
+    return None
 
 
 def call_assemblyai_llm_gateway(prompt: str, model: str = DEFAULT_LLM_MODEL, retries: int = 2) -> str | None:
@@ -131,11 +176,11 @@ def generate_test_questions(
         f"]\n"
     )
 
-    llm_output = call_assemblyai_llm_gateway(prompt)
+    llm_output = call_gemini(prompt)
     if not llm_output:
         raise HTTPException(
             status_code=502,
-            detail="Failed to generate questions via AssemblyAI LLM Gateway API. Ensure AssemblyAI API key is configured and valid."
+            detail="Failed to generate questions via Gemini. Ensure GEMINI_API_KEY is configured and valid."
         )
 
     try:
@@ -168,7 +213,7 @@ def generate_test_questions(
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to parse AI-generated questions from AssemblyAI LLM Gateway: {str(exc)}"
+            detail=f"Failed to parse Gemini-generated questions: {str(exc)}"
         ) from exc
 
 
@@ -215,11 +260,11 @@ def evaluate_question_response(
         f"}}\n"
     )
 
-    llm_output = call_assemblyai_llm_gateway(prompt)
+    llm_output = call_gemini(prompt)
     if not llm_output:
         raise HTTPException(
             status_code=502,
-            detail="Failed to evaluate response via AssemblyAI LLM Gateway API. Ensure AssemblyAI API key is configured and valid."
+            detail="Failed to evaluate response via Gemini. Ensure GEMINI_API_KEY is configured and valid."
         )
 
     try:
@@ -230,13 +275,14 @@ def evaluate_question_response(
         if not isinstance(eval_dict, dict) or "overall_score" not in eval_dict:
             raise ValueError("LLM returned incomplete grading schema.")
 
-        score = int(eval_dict.get("overall_score", 70))
+        score = max(0, min(100, int(eval_dict.get("overall_score", 70))))
         next_diff = get_next_adaptive_difficulty(difficulty_level, score, adaptive_mode)
 
         return {
             "question_id": question_id,
             "transcript": transcript,
             "overall_score": score,
+            "score": score,
             "accuracy_rating": str(eval_dict.get("accuracy_rating", "Partially Correct")),
             "strengths": [str(s)[:80] for s in eval_dict.get("strengths", ["Clear vocal articulation"])][:2],
             "weaknesses": [str(w)[:80] for w in eval_dict.get("weaknesses", ["Missed specific benchmark metrics"])][:2],
@@ -248,7 +294,7 @@ def evaluate_question_response(
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to parse AI evaluation from AssemblyAI LLM Gateway: {str(exc)}"
+            detail=f"Failed to parse Gemini evaluation: {str(exc)}"
         ) from exc
 
 

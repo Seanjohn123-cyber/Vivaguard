@@ -99,15 +99,32 @@ async def generate_test_interview(req: TestGenerateRequest) -> TestGenerateRespo
 @app.post("/api/v1/interview/grade", response_model=QuestionEvaluateResponse)
 async def evaluate_test_question(req: QuestionEvaluateRequest) -> QuestionEvaluateResponse:
     """Grades a spoken response to a test question, returning score, strengths, weaknesses, and next difficulty tier."""
-    res = evaluate_question_response(
-        question_id=req.question_id,
-        question_text=req.question_text,
-        criteria=req.evaluation_criteria,
-        transcript=req.transcript,
-        difficulty_level=req.difficulty_level,
-        adaptive_mode=req.adaptive_mode,
-    )
-    return QuestionEvaluateResponse(**res)
+    try:
+        res = await asyncio.to_thread(
+            evaluate_question_response,
+            question_id=req.question_id,
+            question_text=req.question_text,
+            criteria=req.evaluation_criteria,
+            transcript=req.transcript,
+            difficulty_level=req.difficulty_level,
+            adaptive_mode=req.adaptive_mode,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Unable to grade the response") from exc
+
+    response = QuestionEvaluateResponse(**res)
+    if req.session_id:
+        await broker.broadcast(
+            req.session_id,
+            {
+                "type": "grade_result",
+                "session_id": req.session_id,
+                "payload": response.model_dump(),
+            },
+        )
+    return response
 
 
 @app.post("/api/v1/test-interview/cumulative-report")

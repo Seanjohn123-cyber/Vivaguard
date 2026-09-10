@@ -57,6 +57,7 @@ class TestGenerateResponse(BaseModel):
 
 
 class QuestionEvaluateRequest(BaseModel):
+    session_id: str | None = Field(None, description="Optional live session to receive the grading event")
     question_id: int
     question_text: str
     evaluation_criteria: list[str] = Field(
@@ -73,6 +74,7 @@ class QuestionEvaluateResponse(BaseModel):
     question_id: int
     transcript: str
     overall_score: int
+    score: int
     accuracy_rating: str
     strengths: list[str]
     weaknesses: list[str]
