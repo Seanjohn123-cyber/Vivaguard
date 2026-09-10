@@ -20,6 +20,7 @@ class SessionManager:
         self._sessions: dict[str, SessionRecord] = {}
 
     def create_session(self, session_id: str, metadata: dict[str, Any] | None = None) -> SessionRecord:
+        """Creates and returns a new SessionRecord for session_id, or returns existing record if present."""
         if session_id in self._sessions:
             return self._sessions[session_id]
 
@@ -32,9 +33,11 @@ class SessionManager:
         return session
 
     def get_session(self, session_id: str) -> SessionRecord | None:
+        """Retrieves SessionRecord for session_id, or returns None if session does not exist."""
         return self._sessions.get(session_id)
 
     def update_status(self, session_id: str, status: str) -> SessionRecord | None:
+        """Updates operational status (e.g. 'active', 'completed') of a session."""
         session = self._sessions.get(session_id)
         if session is None:
             return None
@@ -42,6 +45,7 @@ class SessionManager:
         return session
 
     def add_usage(self, session_id: str, input_tokens: int = 0, output_tokens: int = 0) -> SessionRecord | None:
+        """Increments input, output, and total token counters for a session."""
         session = self._sessions.get(session_id)
         if session is None:
             return None
