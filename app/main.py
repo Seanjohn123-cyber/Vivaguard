@@ -17,6 +17,8 @@ from app.schemas import (
     HealthResponse,
     QuestionEvaluateRequest,
     QuestionEvaluateResponse,
+    RouteInfo,
+    RouteCatalogResponse,
     TestCumulativeReportRequest,
     TestGenerateRequest,
     TestGenerateResponse,
@@ -27,7 +29,22 @@ from app.test_simulator import (
     generate_test_questions,
 )
 
-app = FastAPI(title=settings.app_name)
+app = FastAPI(
+    title="VivaGuard API",
+    description=(
+        "Backend API for VivaGuard interview question generation, Gemini grading, "
+        "live copilot telemetry, and session event routing. See GET /api/v1/routes "
+        "for the complete HTTP and WebSocket route catalog."
+    ),
+    version="1.0.0",
+    contact={"name": "VivaGuard Engineering"},
+    openapi_tags=[
+        {"name": "System", "description": "Service health and route discovery."},
+        {"name": "Interview Simulator", "description": "Generate and grade practice interview responses."},
+        {"name": "Live Copilot", "description": "Real-time transcript and copilot WebSocket sessions."},
+        {"name": "Events", "description": "Session event routing and debrief reports."},
+    ],
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,13 +69,13 @@ assemblyai = AssemblyAIClient(
 )
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health() -> HealthResponse:
     """Health check endpoint confirming broker service availability and status."""
     return HealthResponse()
 
 
-@app.post("/api/v1/route", response_model=BrokerResponse)
+@app.post("/api/v1/route", response_model=BrokerResponse, tags=["Events"])
 async def route_event(event: BrokerEvent) -> BrokerResponse:
     """Routes an incoming broker event to all active WebSocket connections for a given session ID."""
     try:
@@ -68,8 +85,8 @@ async def route_event(event: BrokerEvent) -> BrokerResponse:
     return BrokerResponse(ok=True, message="Event routed", event_id=event.event_id)
 
 
-@app.post("/api/debrief")
-@app.post("/api/v1/debrief")
+@app.post("/api/debrief", tags=["Events"])
+@app.post("/api/v1/debrief", tags=["Events"])
 async def debrief_endpoint(req: DebriefRequest) -> dict[str, Any]:
     """Generates post-defense session debrief report containing STAR framework analysis, scores, and verdict."""
     return generate_debrief(
@@ -81,8 +98,8 @@ async def debrief_endpoint(req: DebriefRequest) -> dict[str, Any]:
 
 
 # Test Interview Simulator (Mode A) Endpoints
-@app.post("/api/v1/test-interview/generate", response_model=TestGenerateResponse)
-@app.post("/api/v1/interview/questions/generate", response_model=TestGenerateResponse)
+@app.post("/api/v1/test-interview/generate", response_model=TestGenerateResponse, tags=["Interview Simulator"])
+@app.post("/api/v1/interview/questions/generate", response_model=TestGenerateResponse, tags=["Interview Simulator"])
 async def generate_test_interview(req: TestGenerateRequest) -> TestGenerateResponse:
     """Generates structured interview or defense questions tailored to domain, format, and baseline difficulty."""
     res = generate_test_questions(
@@ -95,8 +112,8 @@ async def generate_test_interview(req: TestGenerateRequest) -> TestGenerateRespo
     return TestGenerateResponse(**res)
 
 
-@app.post("/api/v1/test-interview/evaluate-question", response_model=QuestionEvaluateResponse)
-@app.post("/api/v1/interview/grade", response_model=QuestionEvaluateResponse)
+@app.post("/api/v1/test-interview/evaluate-question", response_model=QuestionEvaluateResponse, tags=["Interview Simulator"])
+@app.post("/api/v1/interview/grade", response_model=QuestionEvaluateResponse, tags=["Interview Simulator"])
 async def evaluate_test_question(req: QuestionEvaluateRequest) -> QuestionEvaluateResponse:
     """Grades a spoken response to a test question, returning score, strengths, weaknesses, and next difficulty tier."""
     try:
@@ -127,10 +144,32 @@ async def evaluate_test_question(req: QuestionEvaluateRequest) -> QuestionEvalua
     return response
 
 
-@app.post("/api/v1/test-interview/cumulative-report")
+@app.post("/api/v1/test-interview/cumulative-report", tags=["Interview Simulator"])
 async def cumulative_test_report(req: TestCumulativeReportRequest) -> dict[str, Any]:
     """Generates a cumulative readiness report summarizing performance across all answered test questions."""
     return generate_cumulative_report(req.domain, req.format, req.evaluations)
+
+
+@app.get("/api/v1/routes", response_model=RouteCatalogResponse, tags=["System"])
+async def route_catalog() -> RouteCatalogResponse:
+    """Returns every public HTTP and WebSocket route for frontend integration."""
+    return RouteCatalogResponse(
+        routes=[
+            RouteInfo(method="GET", path="/health", description="Service health check"),
+            RouteInfo(method="GET", path="/api/v1/routes", description="Complete route catalog"),
+            RouteInfo(method="POST", path="/api/v1/route", description="Broadcast a session event"),
+            RouteInfo(method="POST", path="/api/debrief", description="Generate a defense debrief"),
+            RouteInfo(method="POST", path="/api/v1/debrief", description="Generate a defense debrief"),
+            RouteInfo(method="POST", path="/api/v1/interview/questions/generate", description="Generate Gemini-backed questions"),
+            RouteInfo(method="POST", path="/api/v1/test-interview/generate", description="Generate Gemini-backed questions"),
+            RouteInfo(method="POST", path="/api/v1/interview/grade", description="Grade a response with Gemini"),
+            RouteInfo(method="POST", path="/api/v1/test-interview/evaluate-question", description="Grade a response with Gemini"),
+            RouteInfo(method="POST", path="/api/v1/test-interview/cumulative-report", description="Generate a cumulative report"),
+            RouteInfo(method="WEBSOCKET", path="/ws", description="Session event broadcast channel"),
+            RouteInfo(method="WEBSOCKET", path="/ws/copilot", description="Live copilot audio and telemetry"),
+            RouteInfo(method="WEBSOCKET", path="/ws/audio", description="AssemblyAI audio transcription stream"),
+        ]
+    )
 
 
 
