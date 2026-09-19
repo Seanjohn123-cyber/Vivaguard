@@ -20,6 +20,16 @@ class HealthResponse(BaseModel):
     service: str = "vivaguard-broker"
 
 
+class RouteInfo(BaseModel):
+    method: str
+    path: str
+    description: str
+
+
+class RouteCatalogResponse(BaseModel):
+    routes: list[RouteInfo]
+
+
 class DebriefRequest(BaseModel):
     ground_truth: str = ""
     target_question: str = ""

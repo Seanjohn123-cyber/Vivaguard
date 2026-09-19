@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-flash-latest"
+    gemini_fallback_model: str = "gemini-flash-latest"
     gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

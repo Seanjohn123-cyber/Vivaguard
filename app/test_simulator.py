@@ -24,39 +24,55 @@ def call_gemini(prompt: str, retries: int = 2) -> str | None:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": GEMINI_JSON_MIME_TYPE},
     }
-    endpoint = f"{settings.gemini_api_url.rstrip('/')}/{settings.gemini_model}:generateContent"
     headers = {
         "Content-Type": "application/json",
         "X-goog-api-key": settings.gemini_api_key,
     }
 
-    for attempt in range(retries + 1):
-        try:
-            req = urllib.request.Request(
-                endpoint,
-                data=json.dumps(payload).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                candidates = data.get("candidates", [])
-                parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-                text = "".join(str(part.get("text", "")) for part in parts)
-                if text:
-                    return text
-        except urllib.error.HTTPError as http_err:
-            if http_err.code == 429 and attempt < retries:
-                time.sleep(2.0 * (attempt + 1))
-                continue
-            return None
-        except (OSError, ValueError, KeyError, TypeError):
-            if attempt < retries:
-                time.sleep(1.0)
-                continue
-            return None
+    models = [settings.gemini_model]
+    if settings.gemini_fallback_model not in models:
+        models.append(settings.gemini_fallback_model)
 
-    return None
+    last_error = "Gemini returned no generated content"
+    for model_index, model in enumerate(models):
+        endpoint = f"{settings.gemini_api_url.rstrip('/')}/{model}:generateContent"
+        for attempt in range(retries + 1):
+            try:
+                req = urllib.request.Request(
+                    endpoint,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    candidates = data.get("candidates", [])
+                    parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+                    text = "".join(str(part.get("text", "")) for part in parts)
+                    if text:
+                        return text
+                    last_error = f"Gemini model {model} returned no generated content"
+            except urllib.error.HTTPError as http_err:
+                error_body = http_err.read().decode("utf-8", errors="replace")
+                try:
+                    error_message = json.loads(error_body).get("error", {}).get("message", "")
+                except (json.JSONDecodeError, AttributeError):
+                    error_message = ""
+                last_error = f"Gemini HTTP {http_err.code}: {error_message or 'request failed'}"
+                if http_err.code in {429, 500, 503} and attempt < retries:
+                    time.sleep(2.0 * (attempt + 1))
+                    continue
+                if http_err.code in {404, 503} and model_index < len(models) - 1:
+                    break
+                raise HTTPException(status_code=502, detail=last_error) from http_err
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                last_error = f"Gemini request failed: {exc.__class__.__name__}"
+                if attempt < retries:
+                    time.sleep(1.0)
+                    continue
+                raise HTTPException(status_code=502, detail=last_error) from exc
+
+    raise HTTPException(status_code=502, detail=last_error)
 
 
 def call_assemblyai_llm_gateway(prompt: str, model: str = DEFAULT_LLM_MODEL, retries: int = 2) -> str | None:
