@@ -1,76 +1,82 @@
-# Vivaguard Backend Broker
+# VivaGuard AI Backend Engine
 
-This project provides the backend broker for the live voice/AI pipeline shown in the architecture diagram.
+This project provides the production backend broker, real-time AI copilot, speech evaluation engine, and adaptive viva defense system for VivaGuard.
 
-## Stack
+## Technology Stack
 
-- FastAPI
-- Python WebSockets
-- Pydantic models
-- Async broker for session routing
+- **Framework**: FastAPI (Async Python web server)
+- **Real-Time Streaming**: Python WebSockets (16 kHz PCM audio streaming & live copilot broadcast)
+- **Speech-to-Text & Voice Synthesis**: AssemblyAI Realtime STT & AssemblyAI Voice Agent (TTS)
+- **AI Evaluation Engine**: Gemini AI / LLM Gateway for real-time rubric grading & adaptive defense
+- **Data Validation**: Pydantic v2 schemas & OpenAPI 3.1.0 specifications
 
-## Project structure
+## Project Structure
 
-- `app/main.py` - FastAPI application and WebSocket entry point
-- `app/broker.py` - session and message broker logic
-- `app/config.py` - environment settings
-- `app/schemas.py` - request/response schemas
+- `app/main.py` - FastAPI application entry point, CORS configuration, and OpenAPI metadata
+- `app/api/` - Versioned API routers, dependencies (`deps.py`), and endpoint handlers (`v1/functions/`)
+- `app/schemas/` - Pydantic request and response validation models (`debrief.py`, `test_interview.py`, `broker.py`, `tts.py`, `health.py`)
+- `app/services/` - Core domain services (`broker.py`, `evaluator.py`, `test_simulator.py`, `assemblyai_stt.py`, `assemblyai_tts.py`)
+- `export_openapi.py` - Exporter script to generate static `swagger.json`, `openapi.json`, `swagger.yaml`, `openapi.yaml` specs
 
-## Local development
+## Local Development & Setup
 
-1. Create and activate a virtual environment
-2. Install dependencies:
-   `pip install -r requirements.txt`
-3. Create a `.env` file with your local secrets, for example:
-   `ASSEMBLYAI_API_KEY=your_key_here`
-   `GEMINI_API_KEY=your_key_here`
-4. Start the API:
-   `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+1. **Activate virtual environment**:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Configure environment variables** in `.env`:
+   ```env
+   ASSEMBLYAI_API_KEY=your_assemblyai_api_key
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+4. **Start the API server**:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
 
-## Endpoints
+## Interactive Swagger UI & OpenAPI Specs
 
-- `GET /health` - health check
-- `WS /ws?session_id=<id>` - stream audio/transcription events
-- `WS /ws/audio?session_id=<id>` - send 16 kHz PCM audio and receive transcript events
-- `POST /api/v1/route` - enqueue a broker event
-- `POST /api/v1/interview/questions/generate` - generate Gemini-backed questions and rubrics
-- `POST /api/v1/interview/grade` - grade a transcript with Gemini and calculate next difficulty
+FastAPI automatically serves interactive Swagger UI and ReDoc documentation with full schema validation:
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc UI**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **OpenAPI Schema (JSON)**: [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
 
-### Grading request
+### Static OpenAPI / Swagger Specifications
 
-Send the transcript captured by the frontend to `/api/v1/interview/grade`:
+Exported specification files are located at:
+- [`swagger.json`](file:///c:/Users/ADMIN/Desktop/Code/HACKATHONS/vivaguard/swagger.json) / [`openapi.json`](file:///c:/Users/ADMIN/Desktop/Code/HACKATHONS/vivaguard/openapi.json)
+- [`swagger.yaml`](file:///c:/Users/ADMIN/Desktop/Code/HACKATHONS/vivaguard/swagger.yaml) / [`openapi.yaml`](file:///c:/Users/ADMIN/Desktop/Code/HACKATHONS/vivaguard/openapi.yaml)
 
-```json
-{
-  "session_id": "session-123",
-  "question_id": 1,
-  "question_text": "How would you prevent stale reads during a network partition?",
-  "evaluation_criteria": [
-    "Addresses quorum reads",
-    "Explains consistency trade-offs"
-  ],
-  "transcript": "I would use quorum reads and reject writes without a majority.",
-  "difficulty_level": "Senior",
-  "adaptive_mode": true
-}
+To re-export or refresh static OpenAPI specs at any time:
+```bash
+python export_openapi.py
 ```
 
-The HTTP response contains `score` and `overall_score` (0-100), strengths, weaknesses,
-actionable improvements, and `next_recommended_difficulty`. When `session_id` is provided,
-the same response is broadcast to `/ws?session_id=session-123` as a `grade_result` event.
+## API Endpoints
 
-### Live audio protocol
+### Health & Routing
+- `GET /health` - Service health status check
+- `POST /api/v1/route` - Dispatch broker event to active WebSocket session subscribers
+- `WS /ws` - Main session event stream
+- `WS /ws/copilot` - Live AI copilot event channel
+- `WS /ws/audio` - Binary 16 kHz PCM audio stream for AssemblyAI Speech-to-Text
+- `WS /ws/speech-to-speech` - Bi-directional Speech-to-Speech AssemblyAI Voice Agent WebSocket stream
 
-Connect to `/ws/audio` with a unique session id. Send raw 16 kHz PCM audio as binary WebSocket messages. Transcript responses have this shape:
+### Technical Defense & Grading
+- `POST /api/v1/interview/questions/generate` - Generate domain-tailored defense questions & rubrics
+- `POST /api/v1/interview/grade` - Grade candidate text response with Gemini & calculate adaptive difficulty
+- `POST /api/v1/interview/evaluate-audio` - Upload binary audio for AssemblyAI STT transcription & response grading
+- `POST /api/v1/test-interview/evaluate-audio-base64` - Grade base64 encoded audio response with AssemblyAI Voice Agent spoken feedback
+- `POST /api/v1/test-interview/cumulative-report` - Compile cumulative readiness report across answered questions
+- `POST /api/debrief` - Generate post-defense STAR framework debrief report with sub-scores and verdict
 
-```json
-{
-  "type": "transcript",
-  "final": true,
-  "text": "hello",
-  "confidence": 0.98,
-  "words": []
-}
-```
+### Voice & Speech Synthesis (TTS)
+- `POST /api/text-to-speech` - Synthesize text into WAV audio or JSON response via AssemblyAI Voice API
+- `POST /api/v1/tts` - Convert text to WAV audio or JSON base64 payload via AssemblyAI Voice Agent
 
-Send `{"type":"stop"}` as a text message to terminate the AssemblyAI stream cleanly.
+
