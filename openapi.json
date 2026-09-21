@@ -1,0 +1,2276 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Vivaguard Broker",
+    "description": "\n# VivaGuard AI Backend Broker & Evaluation Engine\n\nVivaGuard provides a real-time AI copilot, speech evaluation engine, and adaptive technical interview defense system.\n\n## Key Capabilities:\n- **AssemblyAI Realtime Speech-to-Text**: Stream 16 kHz audio via WebSockets for real-time transcription.\n- **AssemblyAI Voice Agent (TTS & Speech-to-Speech)**: Convert AI coaching feedback and text into audio responses and stream bi-directional voice agent conversations over WebSockets (`/ws/speech-to-speech`).\n- **Gemini / LLM Evaluation Engine**: Analyze answers against technical rubrics, filler words, and domain depth.\n- **Session Event Broker**: Low-latency WebSocket event distribution across client connections.\n- **Adaptive Difficulty Engine**: Dynamically adjust question difficulty tier (Junior, Mid-Level, Senior) based on candidate performance.\n\n## Interactive API Documentation\n- **Swagger UI**: [/docs](http://localhost:8000/docs)\n- **ReDoc**: [/redoc](http://localhost:8000/redoc)\n- **OpenAPI Schema (JSON)**: [/openapi.json](http://localhost:8000/openapi.json)\n",
+    "contact": {
+      "name": "VivaGuard Engineering",
+      "url": "https://vivaguard.ai/"
+    },
+    "license": {
+      "name": "MIT License"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health Check"
+        ],
+        "summary": "Service Health Check",
+        "description": "Returns backend broker status and service readiness for health checks.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/route": {
+      "post": {
+        "tags": [
+          "Event Broker"
+        ],
+        "summary": "Route Live Session Event",
+        "description": "Routes a real-time event (audio, transcript, status, error) to active session WebSocket connections.",
+        "operationId": "route_event_api_v1_route_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrokerEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/debrief": {
+      "post": {
+        "tags": [
+          "Debrief & Evaluation"
+        ],
+        "summary": "Generate Post-Defense Session Debrief Report",
+        "description": "Analyzes full transcript and session history to produce a comprehensive STAR framework debrief report with sub-scores and verdict.",
+        "operationId": "debrief_endpoint_api_debrief_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebriefResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/debrief": {
+      "post": {
+        "tags": [
+          "Debrief & Evaluation"
+        ],
+        "summary": "Generate Post-Defense Session Debrief Report (v1)",
+        "description": "Alias route to generate a post-defense session debrief report containing STAR analysis, sub-scores, and final verdict.",
+        "operationId": "debrief_endpoint_api_v1_debrief_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebriefResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-interview/generate": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Generate Defense Questions",
+        "description": "Generates AI-backed technical defense questions and evaluation criteria rubrics tailored to a domain and difficulty level.",
+        "operationId": "generate_test_interview_api_v1_test_interview_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/questions/generate": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Generate Defense Questions (Alias)",
+        "description": "Alias endpoint for generating domain-specific technical defense questions and scoring criteria.",
+        "operationId": "generate_test_interview_api_v1_interview_questions_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-interview/evaluate-question": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Evaluate Text Response to Defense Question",
+        "description": "Grades candidate text response against checkpoint criteria using AI evaluation engine and yields feedback with optional AssemblyAI spoken audio.",
+        "operationId": "evaluate_test_question_api_v1_test_interview_evaluate_question_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionEvaluateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/grade": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Grade Candidate Response (Alias)",
+        "description": "Alias route to grade candidate text answer, calculate next adaptive difficulty level, and broadcast grade_result via WebSocket if session_id is provided.",
+        "operationId": "evaluate_test_question_api_v1_interview_grade_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionEvaluateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-interview/evaluate-audio": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Transcribe and Evaluate Multipart Audio Answer",
+        "description": "Transcribes an uploaded audio file using AssemblyAI Speech-to-Text and evaluates the resulting transcript against rubric criteria.",
+        "operationId": "evaluate_test_audio_api_v1_test_interview_evaluate_audio_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_evaluate_test_audio_api_v1_test_interview_evaluate_audio_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/evaluate-audio": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Transcribe and Evaluate Multipart Audio Answer (Alias)",
+        "description": "Alias endpoint to upload raw audio binary file for AssemblyAI STT transcription and question grading.",
+        "operationId": "evaluate_test_audio_api_v1_interview_evaluate_audio_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_evaluate_test_audio_api_v1_interview_evaluate_audio_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-interview/evaluate-audio-base64": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Transcribe and Evaluate Base64 Encoded Audio Answer",
+        "description": "Decodes base64 audio payload, transcribes via AssemblyAI STT, and grades response with AssemblyAI Voice Agent spoken feedback.",
+        "operationId": "evaluate_test_audio_base64_api_v1_test_interview_evaluate_audio_base64_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioEvaluateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/test-interview/cumulative-report": {
+      "post": {
+        "tags": [
+          "Technical Defense"
+        ],
+        "summary": "Generate Cumulative Defense Readiness Report",
+        "description": "Compiles overall session performance across all answered defense questions, calculating aggregate readiness percentage and action plan.",
+        "operationId": "cumulative_test_report_api_v1_test_interview_cumulative_report_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCumulativeReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCumulativeReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/text-to-speech": {
+      "post": {
+        "tags": [
+          "Voice & TTS"
+        ],
+        "summary": "AssemblyAI Text-to-Speech",
+        "description": "Accepts text payload and synthesizes audio via AssemblyAI Voice API. Returns binary WAV audio directly or JSON response.",
+        "operationId": "convert_text_to_speech_api_text_to_speech_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "default",
+              "title": "Voice"
+            }
+          },
+          {
+            "name": "sample_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 24000,
+              "title": "Sample Rate"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "wav",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "return_json",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Return Json"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/app__api__v1__functions__text_to_speech__TTSRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/text-to-speech": {
+      "post": {
+        "tags": [
+          "Voice & TTS"
+        ],
+        "summary": "AssemblyAI Text-to-Speech (v1 Alias)",
+        "description": "Alias route to synthesize text payload to spoken audio via AssemblyAI Voice API.",
+        "operationId": "convert_text_to_speech_api_v1_text_to_speech_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "default",
+              "title": "Voice"
+            }
+          },
+          {
+            "name": "sample_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 24000,
+              "title": "Sample Rate"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "wav",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "return_json",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Return Json"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/app__api__v1__functions__text_to_speech__TTSRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tts": {
+      "post": {
+        "tags": [
+          "Voice & TTS"
+        ],
+        "summary": "Convert Text to Speech Audio",
+        "description": "Converts input text into WAV audio using AssemblyAI Voice Agent service. Supports returning raw audio/wav binary or JSON payload with base64 encoded audio.",
+        "operationId": "convert_text_to_audio_api_v1_tts_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "default",
+              "title": "Voice"
+            }
+          },
+          {
+            "name": "sample_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 24000,
+              "title": "Sample Rate"
+            }
+          },
+          {
+            "name": "return_json",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Return Json"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/app__schemas__tts__TTSRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TTSResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice-agent/text-to-audio": {
+      "post": {
+        "tags": [
+          "Voice & TTS"
+        ],
+        "summary": "Voice Agent Text-to-Speech (Alias)",
+        "description": "Alias endpoint for converting text to spoken audio via AssemblyAI Voice Agent service.",
+        "operationId": "convert_text_to_audio_api_v1_voice_agent_text_to_audio_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "default",
+              "title": "Voice"
+            }
+          },
+          {
+            "name": "sample_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 24000,
+              "title": "Sample Rate"
+            }
+          },
+          {
+            "name": "return_json",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Return Json"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/app__schemas__tts__TTSRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TTSResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tts/convert": {
+      "post": {
+        "tags": [
+          "Voice & TTS"
+        ],
+        "summary": "TTS Conversion Endpoint (Alias)",
+        "description": "Alias endpoint for text-to-speech audio synthesis.",
+        "operationId": "convert_text_to_audio_api_v1_tts_convert_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "default",
+              "title": "Voice"
+            }
+          },
+          {
+            "name": "sample_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 24000,
+              "title": "Sample Rate"
+            }
+          },
+          {
+            "name": "return_json",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Return Json"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/app__schemas__tts__TTSRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TTSResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AudioEvaluateRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Optional session id to broadcast grade event",
+            "example": "session-456"
+          },
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "description": "Question ID",
+            "default": 1,
+            "example": 1
+          },
+          "question_text": {
+            "type": "string",
+            "title": "Question Text",
+            "description": "Target question text",
+            "example": "Explain database sharding."
+          },
+          "evaluation_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Criteria",
+            "description": "Evaluation criteria list",
+            "example": [
+              "Explains hash sharding vs range sharding"
+            ]
+          },
+          "audio_base64": {
+            "type": "string",
+            "title": "Audio Base64",
+            "description": "Base64 encoded audio string (webm/mp3/wav/m4a)"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "description": "Baseline difficulty level",
+            "default": "junior",
+            "example": "junior"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "description": "Adaptive mode enabled",
+            "default": true,
+            "example": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_text",
+          "audio_base64"
+        ],
+        "title": "AudioEvaluateRequest"
+      },
+      "Body_evaluate_test_audio_api_v1_interview_evaluate_audio_post": {
+        "properties": {
+          "audio_file": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio File"
+          },
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "default": 1
+          },
+          "question_text": {
+            "type": "string",
+            "title": "Question Text"
+          },
+          "evaluation_criteria": {
+            "type": "string",
+            "title": "Evaluation Criteria",
+            "default": "[]"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "default": "junior"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "default": true
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_file",
+          "question_text"
+        ],
+        "title": "Body_evaluate_test_audio_api_v1_interview_evaluate_audio_post"
+      },
+      "Body_evaluate_test_audio_api_v1_test_interview_evaluate_audio_post": {
+        "properties": {
+          "audio_file": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio File"
+          },
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "default": 1
+          },
+          "question_text": {
+            "type": "string",
+            "title": "Question Text"
+          },
+          "evaluation_criteria": {
+            "type": "string",
+            "title": "Evaluation Criteria",
+            "default": "[]"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "default": "junior"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "default": true
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_file",
+          "question_text"
+        ],
+        "title": "Body_evaluate_test_audio_api_v1_test_interview_evaluate_audio_post"
+      },
+      "BrokerEvent": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id",
+            "description": "Unique UUID or string identifying the event",
+            "example": "evt-98765"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "Target session ID for live WebSocket client broadcasting",
+            "example": "session-123"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "transcript",
+              "tool_call",
+              "status",
+              "error"
+            ],
+            "title": "Type",
+            "description": "Category type of the broker event",
+            "example": "transcript"
+          },
+          "payload": {
+            "type": "object",
+            "title": "Payload",
+            "description": "Event payload dictionary passed to subscribers",
+            "example": {
+              "final": true,
+              "text": "Hello VivaGuard"
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "session_id",
+          "type"
+        ],
+        "title": "BrokerEvent"
+      },
+      "BrokerResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "description": "Indicates whether the event routing succeeded",
+            "default": true,
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status message detailing routing execution",
+            "default": "Event routed",
+            "example": "Event routed"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id",
+            "description": "Event ID that was dispatched",
+            "example": "evt-98765"
+          }
+        },
+        "type": "object",
+        "title": "BrokerResponse"
+      },
+      "CriticalShiftSchema": {
+        "properties": {
+          "timestamp_sec": {
+            "type": "number",
+            "title": "Timestamp Sec",
+            "description": "Timestamp in seconds when key signal shift occurred"
+          },
+          "signal": {
+            "type": "string",
+            "title": "Signal",
+            "description": "Signal level: GREEN, AMBER, or RED"
+          },
+          "spoken_phrase": {
+            "type": "string",
+            "title": "Spoken Phrase",
+            "description": "Spoken phrase or coaching nudge at signal shift"
+          },
+          "coaching_feedback": {
+            "type": "string",
+            "title": "Coaching Feedback",
+            "description": "Actionable coaching feedback provided to candidate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp_sec",
+          "signal",
+          "spoken_phrase",
+          "coaching_feedback"
+        ],
+        "title": "CriticalShiftSchema"
+      },
+      "DebriefRequest": {
+        "properties": {
+          "ground_truth": {
+            "type": "string",
+            "title": "Ground Truth",
+            "description": "Target ground truth answer facts or ideal rubric criteria",
+            "default": "",
+            "example": "LSM tree buffer flushing uses sequential log writes to optimize throughput."
+          },
+          "target_question": {
+            "type": "string",
+            "title": "Target Question",
+            "description": "Main topic question asked during the defense session",
+            "default": "",
+            "example": "How does LSM tree buffering minimize disk write amplification?"
+          },
+          "full_transcript": {
+            "type": "string",
+            "title": "Full Transcript",
+            "description": "Complete transcript of candidate spoken responses throughout session",
+            "default": "",
+            "example": "I implemented a log-structured merge tree with sequential append buffers..."
+          },
+          "history": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "List of real-time evaluation events captured during session"
+          }
+        },
+        "type": "object",
+        "title": "DebriefRequest"
+      },
+      "DebriefResponse": {
+        "properties": {
+          "overall_score": {
+            "type": "integer",
+            "title": "Overall Score",
+            "description": "Overall defense score (0-100)",
+            "example": 85
+          },
+          "clarity_score": {
+            "type": "integer",
+            "title": "Clarity Score",
+            "description": "Clarity and delivery sub-score (0-100)",
+            "example": 88
+          },
+          "confidence_score": {
+            "type": "integer",
+            "title": "Confidence Score",
+            "description": "Poise and vocal confidence sub-score (0-100)",
+            "example": 82
+          },
+          "technical_depth_score": {
+            "type": "integer",
+            "title": "Technical Depth Score",
+            "description": "Technical depth and accuracy sub-score (0-100)",
+            "example": 86
+          },
+          "green_percentage": {
+            "type": "integer",
+            "title": "Green Percentage",
+            "description": "Percentage of GREEN signals recorded",
+            "example": 75
+          },
+          "amber_percentage": {
+            "type": "integer",
+            "title": "Amber Percentage",
+            "description": "Percentage of AMBER signals recorded",
+            "example": 20
+          },
+          "red_percentage": {
+            "type": "integer",
+            "title": "Red Percentage",
+            "description": "Percentage of RED signals recorded",
+            "example": 5
+          },
+          "total_fillers": {
+            "type": "integer",
+            "title": "Total Fillers",
+            "description": "Total count of filler words detected (e.g. um, uh, like)",
+            "example": 2
+          },
+          "total_technical_keywords": {
+            "type": "integer",
+            "title": "Total Technical Keywords",
+            "description": "Total count of domain technical keywords mentioned",
+            "example": 6
+          },
+          "dodged_questions_count": {
+            "type": "integer",
+            "title": "Dodged Questions Count",
+            "description": "Count of questions dodged or answered vaguely",
+            "example": 0
+          },
+          "total_duration_sec": {
+            "type": "number",
+            "title": "Total Duration Sec",
+            "description": "Total defense session duration in seconds",
+            "example": 180.5
+          },
+          "ideal_star_answer": {
+            "$ref": "#/components/schemas/StarAnswerSchema",
+            "description": "STAR framework breakdown of ideal answer structure"
+          },
+          "key_strengths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Key Strengths",
+            "description": "Highlighted technical strengths"
+          },
+          "key_weaknesses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Key Weaknesses",
+            "description": "Highlighted areas for improvement"
+          },
+          "suggested_followup_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Followup Questions",
+            "description": "Recommended follow-up questions for candidate practice"
+          },
+          "critical_shifts": {
+            "items": {
+              "$ref": "#/components/schemas/CriticalShiftSchema"
+            },
+            "type": "array",
+            "title": "Critical Shifts",
+            "description": "Recorded timeline shifts during interrogation"
+          },
+          "defense_verdict": {
+            "type": "string",
+            "title": "Defense Verdict",
+            "description": "Final defense evaluation verdict",
+            "example": "Strong Technical Defense"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall_score",
+          "clarity_score",
+          "confidence_score",
+          "technical_depth_score",
+          "green_percentage",
+          "amber_percentage",
+          "red_percentage",
+          "total_fillers",
+          "total_technical_keywords",
+          "dodged_questions_count",
+          "total_duration_sec",
+          "ideal_star_answer",
+          "key_strengths",
+          "key_weaknesses",
+          "suggested_followup_questions",
+          "critical_shifts",
+          "defense_verdict"
+        ],
+        "title": "DebriefResponse"
+      },
+      "GeneratedQuestionSchema": {
+        "properties": {
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "description": "Unique question identifier within the generated interview",
+            "example": 1
+          },
+          "question_text": {
+            "type": "string",
+            "title": "Question Text",
+            "description": "Target question text generated by AI engine",
+            "example": "How would you handle split-brain scenarios in a multi-region cluster?"
+          },
+          "difficulty": {
+            "type": "string",
+            "title": "Difficulty",
+            "description": "Question difficulty: Junior, Mid-Level, or Senior",
+            "default": "Mid-Level",
+            "example": "Mid-Level"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "description": "Alias for question difficulty level",
+            "default": "Mid-Level",
+            "example": "Mid-Level"
+          },
+          "evaluation_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Criteria",
+            "description": "Key checkpoint criteria required in a successful response",
+            "example": [
+              "Explains Raft consensus quorum",
+              "Mentions network partition isolation"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "question_text"
+        ],
+        "title": "GeneratedQuestionSchema"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service",
+            "default": "vivaguard-broker"
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse"
+      },
+      "QuestionEvaluateRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Optional live session ID to broadcast grade event over WebSocket",
+            "example": "session-123"
+          },
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "description": "ID of question being evaluated",
+            "example": 1
+          },
+          "question_text": {
+            "type": "string",
+            "title": "Question Text",
+            "description": "Text of question being answered",
+            "example": "How do you handle lock contention?"
+          },
+          "evaluation_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Criteria",
+            "description": "Evaluation criteria or key checkpoint requirements for grading",
+            "example": [
+              "Mentions mutex lock granularity",
+              "Discusses lock-free data structures"
+            ]
+          },
+          "transcript": {
+            "type": "string",
+            "title": "Transcript",
+            "description": "Spoken or written response transcript",
+            "default": "",
+            "example": "I use lock-free atomic CAS operations and fine-grained mutex locks."
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "description": "Difficulty tier under which response is evaluated",
+            "default": "Mid-Level",
+            "example": "Mid-Level"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "description": "Whether adaptive progression is active",
+            "default": true,
+            "example": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "question_text"
+        ],
+        "title": "QuestionEvaluateRequest"
+      },
+      "QuestionEvaluateResponse": {
+        "properties": {
+          "question_id": {
+            "type": "integer",
+            "title": "Question Id",
+            "description": "Evaluated question ID",
+            "example": 1
+          },
+          "transcript": {
+            "type": "string",
+            "title": "Transcript",
+            "description": "Candidate transcript evaluated",
+            "example": "I use lock-free atomic CAS operations..."
+          },
+          "overall_score": {
+            "type": "integer",
+            "title": "Overall Score",
+            "description": "Overall score for the response (0-100)",
+            "example": 88
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score",
+            "description": "Score alias (0-100)",
+            "example": 88
+          },
+          "accuracy_rating": {
+            "type": "string",
+            "title": "Accuracy Rating",
+            "description": "Qualitative evaluation rating",
+            "example": "Strong Technical Defense"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strengths",
+            "description": "Key strengths identified in the answer"
+          },
+          "weaknesses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Weaknesses",
+            "description": "Key areas for improvement"
+          },
+          "actionable_improvements": {
+            "type": "string",
+            "title": "Actionable Improvements",
+            "description": "Targeted coaching recommendation"
+          },
+          "ideal_response_summary": {
+            "type": "string",
+            "title": "Ideal Response Summary",
+            "description": "Concise model answer summary"
+          },
+          "difficulty_evaluated": {
+            "type": "string",
+            "title": "Difficulty Evaluated",
+            "description": "Difficulty tier evaluated",
+            "default": "Mid-Level",
+            "example": "Mid-Level"
+          },
+          "next_recommended_difficulty": {
+            "type": "string",
+            "title": "Next Recommended Difficulty",
+            "description": "Recommended difficulty for next question",
+            "default": "Mid-Level",
+            "example": "Senior"
+          },
+          "audio_base64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Base64",
+            "description": "AssemblyAI Voice Agent generated speech feedback in base64 WAV format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "transcript",
+          "overall_score",
+          "score",
+          "accuracy_rating",
+          "strengths",
+          "weaknesses",
+          "actionable_improvements",
+          "ideal_response_summary"
+        ],
+        "title": "QuestionEvaluateResponse"
+      },
+      "StarAnswerSchema": {
+        "properties": {
+          "Situation": {
+            "type": "string",
+            "title": "Situation",
+            "description": "Context framing of the candidate response"
+          },
+          "Task": {
+            "type": "string",
+            "title": "Task",
+            "description": "Core challenge or technical requirement"
+          },
+          "Action": {
+            "type": "string",
+            "title": "Action",
+            "description": "Actions and methodology articulated by candidate"
+          },
+          "Result": {
+            "type": "string",
+            "title": "Result",
+            "description": "Outcome and performance defense summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "Situation",
+          "Task",
+          "Action",
+          "Result"
+        ],
+        "title": "StarAnswerSchema"
+      },
+      "TTSResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Status of the text-to-audio operation",
+            "default": "success"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Original input text"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "Audio format",
+            "default": "wav"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "title": "Sample Rate",
+            "description": "Sample rate of generated audio",
+            "default": 24000
+          },
+          "audio_base64": {
+            "type": "string",
+            "title": "Audio Base64",
+            "description": "Base64 encoded audio data"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "title": "Duration Seconds",
+            "description": "Estimated duration in seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "audio_base64",
+          "duration_seconds"
+        ],
+        "title": "TTSResponse"
+      },
+      "TestCumulativeReportRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Interview domain name",
+            "default": "",
+            "example": "Backend Architecture"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "Interview format",
+            "default": "",
+            "example": "System Design"
+          },
+          "evaluations": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evaluations",
+            "description": "List of completed question evaluation response objects"
+          }
+        },
+        "type": "object",
+        "title": "TestCumulativeReportRequest"
+      },
+      "TestCumulativeReportResponse": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Interview domain",
+            "example": "Backend Architecture"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "Interview format",
+            "example": "System Design"
+          },
+          "overall_score": {
+            "type": "integer",
+            "title": "Overall Score",
+            "description": "Overall cumulative score across all questions",
+            "example": 84
+          },
+          "readiness_percentage": {
+            "type": "integer",
+            "title": "Readiness Percentage",
+            "description": "Calculated candidate readiness percentage (0-100)",
+            "example": 87
+          },
+          "total_questions_answered": {
+            "type": "integer",
+            "title": "Total Questions Answered",
+            "description": "Number of questions answered in session",
+            "example": 3
+          },
+          "cumulative_strengths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cumulative Strengths",
+            "description": "Deduplicated top cumulative strengths"
+          },
+          "persistent_weaknesses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Persistent Weaknesses",
+            "description": "Deduplicated persistent weaknesses to address"
+          },
+          "action_plan": {
+            "type": "string",
+            "title": "Action Plan",
+            "description": "Targeted actionable training plan for candidate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "format",
+          "overall_score",
+          "readiness_percentage",
+          "total_questions_answered",
+          "cumulative_strengths",
+          "persistent_weaknesses",
+          "action_plan"
+        ],
+        "title": "TestCumulativeReportResponse"
+      },
+      "TestGenerateRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Interview domain or defense topic",
+            "example": "Distributed Database Architecture"
+          },
+          "question_count": {
+            "type": "integer",
+            "title": "Question Count",
+            "description": "Number of questions to generate (e.g., 2, 3, 5, or 10)",
+            "default": 2,
+            "example": 2
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "description": "Baseline difficulty tier: junior, Mid-Level, or Senior",
+            "default": "junior",
+            "example": "junior"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "description": "Enable adaptive difficulty progression",
+            "default": true,
+            "example": true
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "Interview format profile",
+            "default": "Technical Deep Dive",
+            "example": "Technical Deep Dive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain"
+        ],
+        "title": "TestGenerateRequest"
+      },
+      "TestGenerateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "Generated session UUID for live routing",
+            "example": "test-session-9876"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Domain of generated interview",
+            "example": "Distributed Database Architecture"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "Interview format",
+            "example": "Technical Deep Dive"
+          },
+          "difficulty_level": {
+            "type": "string",
+            "title": "Difficulty Level",
+            "description": "Baseline difficulty tier",
+            "default": "Mid-Level",
+            "example": "Mid-Level"
+          },
+          "adaptive_mode": {
+            "type": "boolean",
+            "title": "Adaptive Mode",
+            "description": "Whether adaptive difficulty is enabled",
+            "default": true,
+            "example": true
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/GeneratedQuestionSchema"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "Generated questions with evaluation rubrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "domain",
+          "format",
+          "questions"
+        ],
+        "title": "TestGenerateResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "app__api__v1__functions__text_to_speech__TTSRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "Text content to be converted to speech audio",
+            "example": "Hello, welcome to VivaGuard."
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice",
+            "description": "Voice identifier or style profile",
+            "default": "default",
+            "example": "default"
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate",
+            "description": "Audio sample rate in Hz",
+            "default": 24000,
+            "example": 24000
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "Target audio format (wav or pcm)",
+            "default": "wav",
+            "example": "wav"
+          },
+          "return_json": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Json",
+            "description": "If true, returns JSON response instead of binary audio stream",
+            "default": false,
+            "example": false
+          }
+        },
+        "type": "object",
+        "title": "TTSRequest"
+      },
+      "app__schemas__tts__TTSRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Text content to be converted to speech audio",
+            "example": "Hello, welcome to VivaGuard."
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice",
+            "description": "Voice identifier or style profile",
+            "default": "default"
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate",
+            "description": "Audio sample rate in Hz (e.g. 16000, 24000)",
+            "default": 24000
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "Target audio format (wav or pcm)",
+            "default": "wav"
+          },
+          "return_json": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Json",
+            "description": "If true, returns JSON with base64 encoded audio instead of binary audio stream",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TTSRequest"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health Check",
+      "description": "System status, broker readiness checks, and health monitoring endpoints."
+    },
+    {
+      "name": "Event Broker",
+      "description": "Real-time session event dispatching and broadcasting across WebSocket connections."
+    },
+    {
+      "name": "Technical Defense",
+      "description": "AI-driven technical defense question generation, real-time response grading, audio answer evaluation, and cumulative progress reporting."
+    },
+    {
+      "name": "Debrief & Evaluation",
+      "description": "Post-defense debrief reports with STAR framework analysis, sub-scores, and coaching verdict."
+    },
+    {
+      "name": "Voice & TTS",
+      "description": "AssemblyAI Voice Agent integration, bi-directional Speech-to-Speech agent, and text-to-speech audio synthesis."
+    }
+  ]
+}

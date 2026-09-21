@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VivaGuard - Real-time Voice Agent</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --accent: #38bdf8;
+      --active: #10b981;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      background: var(--border);
+      color: #94a3b8;
+    }
+
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1.5rem 0;
+      font-size: 0.95rem;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: background-color 0.3s;
+    }
+
+    .status-dot.connected { background-color: var(--active); }
+    .status-dot.recording { background-color: var(--danger); animation: pulse 1.5s infinite; }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.8rem 1.2rem;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .btn-start {
+      background-color: var(--accent);
+      color: #0f172a;
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background-color: #0284c7;
+    }
+
+    .btn-stop {
+      background-color: var(--danger);
+      color: #ffffff;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .transcript-box {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 200px;
+      overflow-y: auto;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #94a3b8;
+    }
+
+    .log-entry { margin-bottom: 0.4rem; }
+    .log-agent { color: #38bdf8; }
+    .log-user { color: #4ade80; }
+    .log-system { color: #cbd5e1; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>VivaGuard Voice Agent <span class="badge">S2S</span></h1>
+    <p style="color: #94a3b8; font-size: 0.9rem;">
+      Live two-way speech streaming via AssemblyAI Voice Agent.
+    </p>
+
+    <div class="status-container">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">Disconnected</span>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn-start" onclick="startSession()">Start Talking</button>
+      <button id="stopBtn" class="btn-stop" onclick="stopSession()" disabled>Stop</button>
+    </div>
+
+    <div class="transcript-box" id="logs">
+      <div class="log-entry log-system">Click "Start Talking" to begin session...</div>
+    </div>
+  </div>
+
+  <script>
+    const WS_URL = "ws://localhost:8000/ws/api/text-to-speech";
+    const TARGET_SAMPLE_RATE = 24000;
+
+    let socket = null;
+    let audioContext = null;
+    let micStream = null;
+    let processorNode = null;
+    let nextAudioPlaybackTime = 0;
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const logs = document.getElementById("logs");
+
+    function log(msg, type = "system") {
+      const entry = document.createElement("div");
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = msg;
+      logs.appendChild(entry);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    async function startSession() {
+      try {
+        startBtn.disabled = true;
+        statusText.textContent = "Connecting...";
+
+        // 1. Initialize AudioContext for microphone capture and speaker output
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: TARGET_SAMPLE_RATE,
+        });
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        // 2. Request user microphone
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: TARGET_SAMPLE_RATE,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        });
+
+        // 3. Connect to the WebSocket
+        socket = new WebSocket(WS_URL);
+        socket.binaryType = "arraybuffer";
+
+        socket.onopen = () => {
+          statusText.textContent = "Connected & Listening";
+          statusDot.className = "status-dot recording";
+          stopBtn.disabled = false;
+          log("Connected to VivaGuard Voice Agent.", "system");
+
+          // Start audio capture after WebSocket is open
+          startAudioProcessing();
+        };
+
+        socket.onmessage = async (event) => {
+          if (typeof event.data === "string") {
+            try {
+              const data = JSON.parse(event.data);
+              // Handle transcriptions or events returned by AssemblyAI
+              if (data.transcript) {
+                log(`User: ${data.transcript}`, "user");
+              } else if (data.text || data.agent_response) {
+                log(`Agent: ${data.text || data.agent_response}`, "log-agent");
+              } else {
+                log(`Event: ${event.data}`, "system");
+              }
+            } catch {
+              log(`Message: ${event.data}`, "system");
+            }
+          } else {
+            // Binary audio received from agent (PCM 16-bit 24kHz)
+            playAudioChunk(event.data);
+          }
+        };
+
+        socket.onclose = () => {
+          log("Connection closed.", "system");
+          stopSession();
+        };
+
+        socket.onerror = (err) => {
+          log("WebSocket encountered an error.", "system");
+          console.error(err);
+          stopSession();
+        };
+
+      } catch (err) {
+        log(`Error: ${err.message}`, "system");
+        console.error(err);
+        stopSession();
+      }
+    }
+
+    function startAudioProcessing() {
+      const source = audioContext.createMediaStreamSource(micStream);
+      // Process chunks of 4096 samples (~170ms buffers)
+      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+      processorNode.onaudioprocess = (e) => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const float32Input = e.inputBuffer.getChannelData(0);
+        const pcm16Buffer = float32ToPCM16(float32Input);
+
+        // Stream raw PCM bytes over the WebSocket to backend
+        socket.send(pcm16Buffer);
+      };
+
+      source.connect(processorNode);
+      processorNode.connect(audioContext.destination);
+    }
+
+    // Convert Web Audio Float32 to standard signed 16-bit PCM
+    function float32ToPCM16(float32Array) {
+      const buffer = new ArrayBuffer(float32Array.length * 2);
+      const view = new DataView(buffer);
+      for (let i = 0; i < float32Array.length; i++) {
+        let s = Math.max(-1, Math.min(1, float32Array[i]));
+        // Convert to 16-bit signed integer (-32768 to 32767)
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+      return buffer;
+    }
+
+    // Schedule and play streaming audio chunks without gaps/clicks
+    function playAudioChunk(arrayBuffer) {
+      const int16Array = new Int16Array(arrayBuffer);
+      const float32Array = new Float32Array(int16Array.length);
+
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+      }
+
+      const audioBuffer = audioContext.createBuffer(1, float32Array.length, TARGET_SAMPLE_RATE);
+      audioBuffer.copyToChannel(float32Array, 0);
+
+      const bufferSource = audioContext.createBufferSource();
+      bufferSource.buffer = audioBuffer;
+      bufferSource.connect(audioContext.destination);
+
+      const currentTime = audioContext.currentTime;
+      if (nextAudioPlaybackTime < currentTime) {
+        nextAudioPlaybackTime = currentTime;
+      }
+
+      bufferSource.start(nextAudioPlaybackTime);
+      nextAudioPlaybackTime += audioBuffer.duration;
+    }
+
+    function stopSession() {
+      if (processorNode) {
+        processorNode.disconnect();
+        processorNode = null;
+      }
+
+      if (micStream) {
+        micStream.getTracks().forEach((track) => track.stop());
+        micStream = null;
+      }
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+      socket = null;
+
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+        audioContext = null;
+      }
+
+      nextAudioPlaybackTime = 0;
+      statusText.textContent = "Disconnected";
+      statusDot.className = "status-dot";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+  </script>
+</body>
+</html>

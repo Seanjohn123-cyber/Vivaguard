@@ -1,0 +1,8 @@
+{
+  "event_id": "event-001",
+  "session_id": "test-session",
+  "type": "transcript",
+  "payload": {
+    "text": "Hello Vivaguard"
+  }
+}
