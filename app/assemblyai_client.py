@@ -1,6 +1,7 @@
 import asyncio
 import json
 from typing import Any, Awaitable, Callable
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import websockets
 
@@ -15,7 +16,7 @@ class AssemblyAIClient:
         """Returns HTTP header dictionary with Authorization header containing AssemblyAI API key."""
         return {"Authorization": self.api_key}
 
-    async def connect(self) -> Any:
+    async def connect(self, keyterms_prompt: list[str] | None = None) -> Any:
         """Establishes an asynchronous WebSocket connection to AssemblyAI's real-time streaming server.
 
         Raises ValueError if AssemblyAI API key is missing.
@@ -23,8 +24,17 @@ class AssemblyAIClient:
         if not self.api_key:
             raise ValueError("AssemblyAI API key is missing")
 
+        stream_url = self.base_url
+        if keyterms_prompt:
+            parsed_url = urlsplit(self.base_url)
+            query = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+            query["keyterms_prompt"] = json.dumps(keyterms_prompt)
+            stream_url = urlunsplit(
+                (parsed_url.scheme, parsed_url.netloc, parsed_url.path, urlencode(query), parsed_url.fragment)
+            )
+
         return await websockets.connect(
-            self.base_url,
+            stream_url,
             extra_headers=self.headers(),
         )
 
@@ -94,13 +104,14 @@ class AssemblyAIClient:
         self,
         audio_queue: asyncio.Queue[bytes | None],
         on_message: Callable[[dict[str, Any]], Awaitable[None] | None],
+        keyterms_prompt: list[str] | None = None,
     ) -> None:
         """Orchestrates bidirectional streaming session with AssemblyAI real-time STT engine.
 
         Concurrently runs an audio sender task to pull chunks from `audio_queue` and a transcript
         receiver task to invoke `on_message` on incoming transcripts.
         """
-        websocket = await self.connect()
+        websocket = await self.connect(keyterms_prompt=keyterms_prompt)
         try:
             await self.begin_session(websocket)
 

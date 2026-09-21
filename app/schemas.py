@@ -20,6 +20,17 @@ class HealthResponse(BaseModel):
     service: str = "vivaguard-broker"
 
 
+class TokenRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class RouteInfo(BaseModel):
     method: str
     path: str

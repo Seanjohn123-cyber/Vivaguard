@@ -2,10 +2,11 @@ import asyncio
 import json
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.assemblyai_client import AssemblyAIClient
+from app.auth import authenticate_user, authenticate_websocket_token, create_access_token, get_current_user
 from app.broker import SessionBroker
 from app.config import settings
 from app.evaluator import evaluate_transcript, generate_debrief
@@ -19,6 +20,8 @@ from app.schemas import (
     QuestionEvaluateResponse,
     RouteInfo,
     RouteCatalogResponse,
+    TokenRequest,
+    TokenResponse,
     TestCumulativeReportRequest,
     TestGenerateRequest,
     TestGenerateResponse,
@@ -48,7 +51,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,8 +78,19 @@ async def health() -> HealthResponse:
     return HealthResponse()
 
 
+@app.post("/api/v1/auth/token", response_model=TokenResponse, tags=["System"])
+async def issue_token(request: TokenRequest) -> TokenResponse:
+    """Issue a short-lived JWT for configured application credentials."""
+    if not authenticate_user(request.username, request.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return TokenResponse(
+        access_token=create_access_token(request.username),
+        expires_in=settings.auth_token_expire_minutes * 60,
+    )
+
+
 @app.post("/api/v1/route", response_model=BrokerResponse, tags=["Events"])
-async def route_event(event: BrokerEvent) -> BrokerResponse:
+async def route_event(event: BrokerEvent, _: str = Depends(get_current_user)) -> BrokerResponse:
     """Routes an incoming broker event to all active WebSocket connections for a given session ID."""
     try:
         await broker.route_event(event.session_id, event.model_dump())
@@ -87,7 +101,7 @@ async def route_event(event: BrokerEvent) -> BrokerResponse:
 
 @app.post("/api/debrief", tags=["Events"])
 @app.post("/api/v1/debrief", tags=["Events"])
-async def debrief_endpoint(req: DebriefRequest) -> dict[str, Any]:
+async def debrief_endpoint(req: DebriefRequest, _: str = Depends(get_current_user)) -> dict[str, Any]:
     """Generates post-defense session debrief report containing STAR framework analysis, scores, and verdict."""
     return generate_debrief(
         ground_truth=req.ground_truth,
@@ -100,7 +114,7 @@ async def debrief_endpoint(req: DebriefRequest) -> dict[str, Any]:
 # Test Interview Simulator (Mode A) Endpoints
 @app.post("/api/v1/test-interview/generate", response_model=TestGenerateResponse, tags=["Interview Simulator"])
 @app.post("/api/v1/interview/questions/generate", response_model=TestGenerateResponse, tags=["Interview Simulator"])
-async def generate_test_interview(req: TestGenerateRequest) -> TestGenerateResponse:
+async def generate_test_interview(req: TestGenerateRequest, _: str = Depends(get_current_user)) -> TestGenerateResponse:
     """Generates structured interview or defense questions tailored to domain, format, and baseline difficulty."""
     res = generate_test_questions(
         domain=req.domain,
@@ -114,7 +128,7 @@ async def generate_test_interview(req: TestGenerateRequest) -> TestGenerateRespo
 
 @app.post("/api/v1/test-interview/evaluate-question", response_model=QuestionEvaluateResponse, tags=["Interview Simulator"])
 @app.post("/api/v1/interview/grade", response_model=QuestionEvaluateResponse, tags=["Interview Simulator"])
-async def evaluate_test_question(req: QuestionEvaluateRequest) -> QuestionEvaluateResponse:
+async def evaluate_test_question(req: QuestionEvaluateRequest, _: str = Depends(get_current_user)) -> QuestionEvaluateResponse:
     """Grades a spoken response to a test question, returning score, strengths, weaknesses, and next difficulty tier."""
     try:
         res = await asyncio.to_thread(
@@ -145,7 +159,7 @@ async def evaluate_test_question(req: QuestionEvaluateRequest) -> QuestionEvalua
 
 
 @app.post("/api/v1/test-interview/cumulative-report", tags=["Interview Simulator"])
-async def cumulative_test_report(req: TestCumulativeReportRequest) -> dict[str, Any]:
+async def cumulative_test_report(req: TestCumulativeReportRequest, _: str = Depends(get_current_user)) -> dict[str, Any]:
     """Generates a cumulative readiness report summarizing performance across all answered test questions."""
     return generate_cumulative_report(req.domain, req.format, req.evaluations)
 
@@ -181,6 +195,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     and broadcasts events to connected session peers.
     """
     session_id = websocket.query_params.get("session_id")
+    try:
+        authenticate_websocket_token(websocket.query_params.get("token"))
+    except (HTTPException, ValueError):
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     if not session_id:
         await websocket.close(code=1008)
         return
@@ -215,14 +234,20 @@ async def copilot_websocket_endpoint(websocket: WebSocket) -> None:
     AssemblyAI STT streaming service, runs `evaluate_transcript` on incoming text, and pushes
     real-time evaluation feedback signals back to client.
     """
-    await websocket.accept()
+    try:
+        authenticate_websocket_token(websocket.query_params.get("token"))
+    except (HTTPException, ValueError):
+        await websocket.close(code=1008, reason="Authentication required")
+        return
 
+    await websocket.accept()
     session_id = websocket.query_params.get("session_id", "copilot_default")
     await broker.register_connection(session_id, websocket)
 
     ground_truth = ""
     target_question = ""
     current_transcript = ""
+    keyterms_prompt: list[str] = []
 
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=32)
 
@@ -237,10 +262,6 @@ async def copilot_websocket_endpoint(websocket: WebSocket) -> None:
             await websocket.send_json(eval_res)
 
     provider_task = None
-    if settings.assemblyai_api_key:
-        provider_task = asyncio.create_task(
-            assemblyai.stream_session(audio_queue, on_assembly_message)
-        )
 
     try:
         while True:
@@ -266,12 +287,26 @@ async def copilot_websocket_endpoint(websocket: WebSocket) -> None:
                 if msg_type == "setup":
                     ground_truth = payload.get("ground_truth", "")
                     target_question = payload.get("target_question", "")
+                    keyterms_prompt = [
+                        str(term).strip()
+                        for term in payload.get("domain_terms", [])
+                        if str(term).strip()
+                    ][:100]
+                    if settings.assemblyai_api_key and provider_task is None:
+                        provider_task = asyncio.create_task(
+                            assemblyai.stream_session(
+                                audio_queue,
+                                on_assembly_message,
+                                keyterms_prompt=keyterms_prompt,
+                            )
+                        )
                     await websocket.send_json(
                         {
                             "type": "setup_ack",
                             "stt_engine": (
                                 "AssemblyAI Realtime STT" if settings.assemblyai_api_key else "Web Speech Engine"
                             ),
+                            "keyterms_prompt": keyterms_prompt,
                         }
                     )
                 elif msg_type == "transcript":
@@ -302,8 +337,18 @@ async def audio_websocket_endpoint(websocket: WebSocket) -> None:
     Pipes incoming PCM bytes to AssemblyAI stream and returns normalized transcript JSON frames back to client.
     """
     session_id = websocket.query_params.get("session_id")
+    keyterms_prompt = [
+        term.strip()
+        for term in websocket.query_params.get("keyterms_prompt", "").split(",")
+        if term.strip()
+    ][:100]
     if not session_id:
         await websocket.close(code=1008, reason="session_id is required")
+        return
+    try:
+        authenticate_websocket_token(websocket.query_params.get("token"))
+    except (HTTPException, ValueError):
+        await websocket.close(code=1008, reason="Authentication required")
         return
     if not settings.assemblyai_api_key:
         await websocket.close(code=1011, reason="AssemblyAI API key is not configured")
@@ -318,7 +363,7 @@ async def audio_websocket_endpoint(websocket: WebSocket) -> None:
             await websocket.send_json(normalized)
 
     provider_task = asyncio.create_task(
-        assemblyai.stream_session(audio_queue, send_transcript)
+        assemblyai.stream_session(audio_queue, send_transcript, keyterms_prompt=keyterms_prompt)
     )
 
     try:

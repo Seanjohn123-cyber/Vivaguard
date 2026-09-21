@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     gemini_fallback_model: str = "gemini-flash-latest"
     gemini_api_url: str = "https://generativelanguage.googleapis.com/v1beta/models"
 
+    auth_jwt_secret: str = ""
+    auth_username: str = ""
+    auth_password: str = ""
+    auth_token_expire_minutes: int = 30
+    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
